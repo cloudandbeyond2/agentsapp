@@ -5,8 +5,8 @@ const http = require('http').Server(app);
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const userRoutes = require('./routes/userRoutes');
-const agentRoutes = require('./routes/agentRoutes');
+const userRoutes = require('../routes/userRoutes');
+const agentRoutes = require('../routes/agentRoutes');
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 // Middleware
