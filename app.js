@@ -7,11 +7,8 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes');
 const agentRoutes = require('./routes/agentRoutes');
- 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
-const bcrypt = require('bcrypt'); // For hashing passwords
-const path = require('path');
 // Middleware
  
 app.use(express.json()); // For JSON parsing
