@@ -11,29 +11,21 @@ const containerName = 'agentfiles'; // Replace with your Azure Blob container na
 
 // Utility function to upload file to Azure Blob Storage
 const uploadToAzure = async (file, blobName) => {
-  try {
-    const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
-    const containerClient = blobServiceClient.getContainerClient(containerName);
+  console.log('Uploading file:', file);
+  const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 
-    // Create container if it doesn't exist
-    const createContainerResponse = await containerClient.createIfNotExists();
-    if (createContainerResponse.succeeded) {
-      console.log(`Container ${containerName} created successfully.`);
-    }
+  const stream = fs.createReadStream(file.filepath);
+  await blockBlobClient.uploadStream(stream, file.size, undefined, {
+    blobHTTPHeaders: { blobContentType: file.mimetype },
+  });
 
-    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-    const stream = fs.createReadStream(file.filepath);
-    await blockBlobClient.uploadStream(stream, file.size, undefined, {
-      blobHTTPHeaders: { blobContentType: file.mimetype },
-    });
-
-    console.log(`File uploaded to Azure: ${blobName}`);
-    return blockBlobClient.url; // Return the URL of the uploaded file
-  } catch (error) {
-    console.error('Error uploading to Azure:', error.message);
-    throw error;
-  }
+  const fileUrl = blockBlobClient.url;
+  console.log('Uploaded file URL:', fileUrl);
+  return fileUrl;
 };
+
 
 // Create a new agent
 exports.createAgent = async (req, res) => {
