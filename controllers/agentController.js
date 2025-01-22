@@ -5,70 +5,71 @@ const Agent = require('../models/Agent');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
+
 // Azure Blob Storage Configuration
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = 'agentfiles'; // Replace with your container name
+const containerName = "agentfiles"; // Azure container name
 
-// Utility function to upload file to Azure Blob Storage
-const uploadToAzure = async (fileBuffer, mimeType, blobName) => {
+// Utility function to upload a file to Azure Blob Storage
+const uploadToAzure = async (filePath, fileType, blobName) => {
   try {
     const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
     const containerClient = blobServiceClient.getContainerClient(containerName);
 
-    // Create container if it doesn't exist
+    // Ensure the container exists
     await containerClient.createIfNotExists();
 
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    const stream = require("fs").createReadStream(filePath);
 
-    // Upload file buffer directly
-    await blockBlobClient.uploadData(fileBuffer, {
-      blobHTTPHeaders: { blobContentType: mimeType },
+    // Upload the file
+    await blockBlobClient.uploadStream(stream, undefined, undefined, {
+      blobHTTPHeaders: { blobContentType: fileType },
     });
 
-    console.log(`File uploaded to Azure: ${blobName}`);
-    return blockBlobClient.url; // Return the URL of the uploaded file
+    console.log(`File uploaded to Azure: ${blockBlobClient.url}`);
+    return blockBlobClient.url; // Return the file URL
   } catch (error) {
-    console.error('Error uploading to Azure:', error.message);
-    throw error;
+    console.error("Error uploading to Azure:", error.message);
+    throw new Error("Failed to upload file to Azure");
   }
 };
 
-// Create a new agent
+// Create Agent Function
 exports.createAgent = async (req, res) => {
   const form = new formidable.IncomingForm({ multiples: true });
+  form.uploadDir = "./temp"; // Temporary directory for uploads
+  form.keepExtensions = true; // Keep file extensions
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error('Error parsing form:', err.message);
-      return res.status(400).json({ message: 'File upload error', error: err.message });
+      console.error("Error parsing form:", err.message);
+      return res.status(400).json({ message: "File upload error", error: err.message });
     }
 
     try {
-      // Normalize fields: Extract single value if it's an array
+      // Normalize fields: Convert arrays to single values
       const normalizedFields = {};
       for (const key in fields) {
         normalizedFields[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
       }
 
-      // Extract agent data from normalized fields
-      const agentData = { ...normalizedFields };
-
       // Validate required fields
-      const requiredFields = ['firstName', 'lastName', 'email', 'mobileNumber', 'gender', 'dateOfBirth'];
+      const requiredFields = ["firstName", "lastName", "email", "mobileNumber", "gender", "dateOfBirth"];
       for (const field of requiredFields) {
-        if (!agentData[field]) {
+        if (!normalizedFields[field]) {
           return res.status(400).json({ message: `Missing required field: ${field}` });
         }
       }
 
       // Check for duplicate email or mobile number
-      const existingEmail = await Agent.findOne({ email: agentData.email });
+      const existingEmail = await Agent.findOne({ email: normalizedFields.email });
       if (existingEmail) {
-        return res.status(400).json({ message: 'Email already exists' });
+        return res.status(400).json({ message: "Email already exists" });
       }
-      const existingMobile = await Agent.findOne({ mobileNumber: agentData.mobileNumber });
+      const existingMobile = await Agent.findOne({ mobileNumber: normalizedFields.mobileNumber });
       if (existingMobile) {
-        return res.status(400).json({ message: 'Mobile number already exists' });
+        return res.status(400).json({ message: "Mobile number already exists" });
       }
 
       // Process and upload files
@@ -76,30 +77,38 @@ exports.createAgent = async (req, res) => {
       for (const [key, file] of Object.entries(files)) {
         if (file && file.filepath) {
           const blobName = `${key}-${uuidv4()}`;
-          const fileBuffer = file._writeBuffer; // Access file buffer from formidable
-          const fileUrl = await uploadToAzure(fileBuffer, file.mimetype, blobName);
+          const fileUrl = await uploadToAzure(file.filepath, file.mimetype, blobName);
           documentUploads[`${key}FilePath`] = fileUrl; // Save the file URL
         }
       }
 
-      // Merge uploaded files URLs with agent data
-      Object.assign(agentData, documentUploads);
-
-      // Generate a unique agent ID
-      agentData.agentId = uuidv4();
+      // Merge uploaded file URLs with agent data
+      const agentData = {
+        ...normalizedFields,
+        ...documentUploads,
+        agentId: uuidv4(), // Assign a unique ID
+        address: {
+          street: normalizedFields.street,
+          wardNumber: normalizedFields.wardNumber,
+          constituency: normalizedFields.constituency,
+          city: normalizedFields.city,
+          state: normalizedFields.state,
+          postCode: normalizedFields.postCode,
+          country: normalizedFields.country,
+        },
+      };
 
       // Save agent to the database
       const newAgent = new Agent(agentData);
       const savedAgent = await newAgent.save();
 
-      res.status(201).json({ message: 'Agent created successfully', agent: savedAgent });
+      res.status(201).json({ message: "Agent created successfully", agent: savedAgent });
     } catch (error) {
-      console.error('Error creating agent:', error.message);
-      res.status(500).json({ message: 'Internal Server Error', error: error.message });
+      console.error("Error creating agent:", error.message);
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
   });
 };
-
 
 // Get all agents
 exports.getAgents = async (req, res) => {
