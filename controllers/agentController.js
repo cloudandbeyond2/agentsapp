@@ -4,9 +4,11 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const Agent = require('../models/Agent');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+
 // Fetching configurations from environment variables
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
 const CONTAINER_NAME = process.env.AZURE_CONTAINER_NAME || "agentfiles"; // Default container name
+
 
 // Utility function to upload file to Azure Blob Storage
 const uploadToAzure = async (filePath, fileType, blobName) => {
@@ -37,12 +39,9 @@ const uploadToAzure = async (filePath, fileType, blobName) => {
 exports.createAgent = async (req, res) => {
   const form = new formidable.IncomingForm();
   form.keepExtensions = true; // Retain file extensions
-  form.uploadDir = path.join(__dirname, "../temp"); // Temporary directory for uploads
 
-  // Ensure temp directory exists
-  if (!fs.existsSync(form.uploadDir)) {
-    fs.mkdirSync(form.uploadDir, { recursive: true });
-  }
+  // Use Vercel's writable directory for temporary storage
+  form.uploadDir = "/tmp";
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -100,8 +99,6 @@ exports.createAgent = async (req, res) => {
     }
   });
 };
-
-
 // Get all agents
 exports.getAgents = async (req, res) => {
   try {
