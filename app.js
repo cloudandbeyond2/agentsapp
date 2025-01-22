@@ -17,15 +17,10 @@ app.use(bodyParser.json()); // For parsing JSON requests
 // CORS Configuration
 const allowedOrigins = ['http://localhost:3000', 'https://electappfrontend.vercel.app'];
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  // origin: "http://localhost:3000", // Allow requests from your React app
+  origin : "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true,
+  credentials: true
 }));
  
 // MongoDB Connection
