@@ -4,23 +4,21 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const Agent = require('../models/Agent');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-
-
-// Azure Blob Storage Configuration
+// Fetching configurations from environment variables
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = "agentfiles"; // Azure container name
+const CONTAINER_NAME = process.env.AZURE_CONTAINER_NAME || "agentfiles"; // Default container name
 
-// Utility function to upload a file to Azure Blob Storage
+// Utility function to upload file to Azure Blob Storage
 const uploadToAzure = async (filePath, fileType, blobName) => {
   try {
     const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
-    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
 
     // Ensure the container exists
     await containerClient.createIfNotExists();
 
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-    const stream = require("fs").createReadStream(filePath);
+    const stream = fs.createReadStream(filePath);
 
     // Upload the file
     await blockBlobClient.uploadStream(stream, undefined, undefined, {
@@ -31,76 +29,69 @@ const uploadToAzure = async (filePath, fileType, blobName) => {
     return blockBlobClient.url; // Return the file URL
   } catch (error) {
     console.error("Error uploading to Azure:", error.message);
-    throw new Error("Failed to upload file to Azure");
+    throw error;
   }
 };
 
-// Create Agent Function
+// Create a new agent
 exports.createAgent = async (req, res) => {
-  const form = new formidable.IncomingForm({ multiples: true });
-  form.uploadDir = "./temp"; // Temporary directory for uploads
-  form.keepExtensions = true; // Keep file extensions
+  const form = new formidable.IncomingForm();
+  form.keepExtensions = true; // Retain file extensions
+  form.uploadDir = path.join(__dirname, "../temp"); // Temporary directory for uploads
+
+  // Ensure temp directory exists
+  if (!fs.existsSync(form.uploadDir)) {
+    fs.mkdirSync(form.uploadDir, { recursive: true });
+  }
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
       console.error("Error parsing form:", err.message);
-      return res.status(400).json({ message: "File upload error", error: err.message });
+      return res.status(400).json({ message: "Error parsing form", error: err.message });
     }
 
     try {
-      // Normalize fields: Convert arrays to single values
-      const normalizedFields = {};
+      // Extract agent data and validate fields
+      const agentData = {};
       for (const key in fields) {
-        normalizedFields[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
+        agentData[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
       }
 
-      // Validate required fields
       const requiredFields = ["firstName", "lastName", "email", "mobileNumber", "gender", "dateOfBirth"];
       for (const field of requiredFields) {
-        if (!normalizedFields[field]) {
+        if (!agentData[field]) {
           return res.status(400).json({ message: `Missing required field: ${field}` });
         }
       }
 
       // Check for duplicate email or mobile number
-      const existingEmail = await Agent.findOne({ email: normalizedFields.email });
-      if (existingEmail) {
-        return res.status(400).json({ message: "Email already exists" });
-      }
-      const existingMobile = await Agent.findOne({ mobileNumber: normalizedFields.mobileNumber });
-      if (existingMobile) {
-        return res.status(400).json({ message: "Mobile number already exists" });
-      }
+      const existingEmail = await Agent.findOne({ email: agentData.email });
+      if (existingEmail) return res.status(400).json({ message: "Email already exists" });
 
-      // Process and upload files
+      const existingMobile = await Agent.findOne({ mobileNumber: agentData.mobileNumber });
+      if (existingMobile) return res.status(400).json({ message: "Mobile number already exists" });
+
+      // Process file uploads
       const documentUploads = {};
-      for (const [key, file] of Object.entries(files)) {
-        if (file && file.filepath) {
-          const blobName = `${key}-${uuidv4()}`;
-          const fileUrl = await uploadToAzure(file.filepath, file.mimetype, blobName);
-          documentUploads[`${key}FilePath`] = fileUrl; // Save the file URL
-        }
+      for (const key in files) {
+        const file = files[key];
+        const blobName = `${key}-${uuidv4()}`;
+        const fileUrl = await uploadToAzure(file.filepath, file.mimetype, blobName);
+        documentUploads[`${key}FilePath`] = fileUrl;
       }
 
-      // Merge uploaded file URLs with agent data
-      const agentData = {
-        ...normalizedFields,
-        ...documentUploads,
-        agentId: uuidv4(), // Assign a unique ID
-        address: {
-          street: normalizedFields.street,
-          wardNumber: normalizedFields.wardNumber,
-          constituency: normalizedFields.constituency,
-          city: normalizedFields.city,
-          state: normalizedFields.state,
-          postCode: normalizedFields.postCode,
-          country: normalizedFields.country,
-        },
-      };
+      // Combine agent data with document URLs
+      Object.assign(agentData, documentUploads);
 
-      // Save agent to the database
+      // Assign a unique agent ID
+      agentData.agentId = uuidv4();
+
+      // Save the agent to the database
       const newAgent = new Agent(agentData);
       const savedAgent = await newAgent.save();
+
+      // Clean up temporary files
+      Object.values(files).forEach((file) => fs.unlinkSync(file.filepath));
 
       res.status(201).json({ message: "Agent created successfully", agent: savedAgent });
     } catch (error) {
@@ -109,6 +100,7 @@ exports.createAgent = async (req, res) => {
     }
   });
 };
+
 
 // Get all agents
 exports.getAgents = async (req, res) => {
