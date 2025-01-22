@@ -38,10 +38,8 @@ const uploadToAzure = async (filePath, fileType, blobName) => {
 // Create a new agent
 exports.createAgent = async (req, res) => {
   const form = new formidable.IncomingForm();
-  form.keepExtensions = true; // Retain file extensions
-
-  // Use Vercel's writable directory for temporary storage
-  form.uploadDir = "/tmp";
+  form.keepExtensions = true;
+  form.uploadDir = "/tmp"; // Use Vercel's writable directory
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -50,10 +48,10 @@ exports.createAgent = async (req, res) => {
     }
 
     try {
-      // Log files object for debugging
+      // Debug uploaded files
       console.log("Uploaded files:", files);
 
-      // Extract agent data and validate fields
+      // Extract and validate fields
       const agentData = {};
       for (const key in fields) {
         agentData[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
@@ -76,8 +74,13 @@ exports.createAgent = async (req, res) => {
       // Process file uploads
       const documentUploads = {};
       for (const key in files) {
-        const file = files[key];
+        const fileArray = files[key]; // Formidable gives arrays for files
+        if (!fileArray || fileArray.length === 0) {
+          console.error(`No file provided for ${key}`);
+          return res.status(400).json({ message: `No file provided for ${key}` });
+        }
 
+        const file = fileArray[0]; // Get the first file in the array
         if (!file.filepath) {
           console.error(`Filepath is missing for ${key}`);
           return res.status(400).json({ message: `Filepath is missing for ${key}` });
@@ -99,11 +102,14 @@ exports.createAgent = async (req, res) => {
       const savedAgent = await newAgent.save();
 
       // Clean up temporary files
-      Object.values(files).forEach((file) => {
-        if (file.filepath) {
-          fs.unlinkSync(file.filepath);
-        }
-      });
+      for (const key in files) {
+        const fileArray = files[key];
+        fileArray.forEach((file) => {
+          if (file.filepath) {
+            fs.unlinkSync(file.filepath);
+          }
+        });
+      }
 
       res.status(201).json({ message: "Agent created successfully", agent: savedAgent });
     } catch (error) {
