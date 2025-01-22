@@ -7,13 +7,10 @@ const path = require('path');
 
 // Azure Blob Storage Configuration
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const containerName = '21l01l2025'; // Replace with your Azure Blob container name
+const containerName = 'agentfiles'; // Replace with your Azure Blob container name
 
 // Utility function to upload file to Azure Blob Storage
 const uploadToAzure = async (file, blobName) => {
-  const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-  const containerName = 'agentfiles';
-
   try {
     const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
     const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -40,18 +37,18 @@ const uploadToAzure = async (file, blobName) => {
 
 // Create a new agent
 exports.createAgent = async (req, res) => {
-  const form = new formidable.IncomingForm();
-  form.uploadDir = './uploads'; // Directory for temporary file storage
-  form.keepExtensions = true;  // Retain file extensions
-  form.on('fileBegin', (name, file) => {
-    file.filepath = `${form.uploadDir}/${file.newFilename}`; // Proper filepath
-  });
-
-  // Ensure the uploads directory exists
-  const uploadsDir = path.join(__dirname, '../uploads');
+  // Ensure the uploads directory exists in /tmp (Vercel's writable directory)
+  const uploadsDir = path.join('/tmp', 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
   }
+
+  const form = new formidable.IncomingForm();
+  form.uploadDir = uploadsDir; // Temporary upload location
+  form.keepExtensions = true; // Retain file extensions
+  form.on('fileBegin', (name, file) => {
+    file.filepath = `${form.uploadDir}/${file.newFilename}`; // Ensure proper file path
+  });
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -154,7 +151,15 @@ exports.getAgentById = async (req, res) => {
 
 // Update an agent
 exports.updateAgent = async (req, res) => {
+  const uploadsDir = path.join('/tmp', 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
   const form = new formidable.IncomingForm();
+  form.uploadDir = uploadsDir; // Temporary upload location
+  form.keepExtensions = true; // Retain file extensions
+
   form.parse(req, async (err, fields, files) => {
     if (err) {
       return res.status(400).json({ message: 'File upload error', error: err.message });
