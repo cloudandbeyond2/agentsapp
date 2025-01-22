@@ -15,7 +15,7 @@ app.use(express.json()); // For JSON parsing
 app.use(bodyParser.json()); // For parsing JSON requests
  
 // CORS Configuration
-const allowedOrigins = ['http://localhost:3000', 'https://your-deployed-app.com'];
+const allowedOrigins = ['http://localhost:3000', 'https://electappfrontend.vercel.app'];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
