@@ -17,23 +17,24 @@ const CONTAINER_NAME = 'agentfiles'; // Azure Blob container name
  */
 const uploadToAzure = async (file, blobName) => {
   try {
+    console.log("Uploading file:", file);
+    console.log("Connection String:", AZURE_STORAGE_CONNECTION_STRING);
+    
     const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
-    const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
-
-    // Ensure the container exists
-    await containerClient.createIfNotExists();
-
+    const containerClient = blobServiceClient.getContainerClient(containerName);
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-    const stream = fs.createReadStream(file.filepath);
 
+    const stream = fs.createReadStream(file.filepath);
     await blockBlobClient.uploadStream(stream, file.size, undefined, {
       blobHTTPHeaders: { blobContentType: file.mimetype },
     });
 
-    return blockBlobClient.url;
+    const fileUrl = blockBlobClient.url;
+    console.log("Uploaded file URL:", fileUrl);
+    return fileUrl;
   } catch (error) {
-    console.error('Error uploading to Azure:', error);
-    throw new Error('Failed to upload file to Azure Blob Storage.');
+    console.error("Error uploading to Azure:", error.message);
+    throw new Error("Failed to upload file to Azure Blob Storage.");
   }
 };
 
