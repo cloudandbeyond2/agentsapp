@@ -37,7 +37,6 @@ const uploadToAzure = async (fileBuffer, mimeType, blobName) => {
 exports.createAgent = async (req, res) => {
   const form = new formidable.IncomingForm({ multiples: true });
 
-  // Parse incoming request
   form.parse(req, async (err, fields, files) => {
     if (err) {
       console.error('Error parsing form:', err.message);
@@ -45,8 +44,14 @@ exports.createAgent = async (req, res) => {
     }
 
     try {
-      // Extract agent data from fields
-      const agentData = { ...fields };
+      // Normalize fields: Extract single value if it's an array
+      const normalizedFields = {};
+      for (const key in fields) {
+        normalizedFields[key] = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
+      }
+
+      // Extract agent data from normalized fields
+      const agentData = { ...normalizedFields };
 
       // Validate required fields
       const requiredFields = ['firstName', 'lastName', 'email', 'mobileNumber', 'gender', 'dateOfBirth'];
@@ -94,6 +99,7 @@ exports.createAgent = async (req, res) => {
     }
   });
 };
+
 
 // Get all agents
 exports.getAgents = async (req, res) => {
