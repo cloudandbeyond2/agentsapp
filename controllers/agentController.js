@@ -50,6 +50,9 @@ exports.createAgent = async (req, res) => {
     }
 
     try {
+      // Log files object for debugging
+      console.log("Uploaded files:", files);
+
       // Extract agent data and validate fields
       const agentData = {};
       for (const key in fields) {
@@ -74,6 +77,12 @@ exports.createAgent = async (req, res) => {
       const documentUploads = {};
       for (const key in files) {
         const file = files[key];
+
+        if (!file.filepath) {
+          console.error(`Filepath is missing for ${key}`);
+          return res.status(400).json({ message: `Filepath is missing for ${key}` });
+        }
+
         const blobName = `${key}-${uuidv4()}`;
         const fileUrl = await uploadToAzure(file.filepath, file.mimetype, blobName);
         documentUploads[`${key}FilePath`] = fileUrl;
@@ -90,7 +99,11 @@ exports.createAgent = async (req, res) => {
       const savedAgent = await newAgent.save();
 
       // Clean up temporary files
-      Object.values(files).forEach((file) => fs.unlinkSync(file.filepath));
+      Object.values(files).forEach((file) => {
+        if (file.filepath) {
+          fs.unlinkSync(file.filepath);
+        }
+      });
 
       res.status(201).json({ message: "Agent created successfully", agent: savedAgent });
     } catch (error) {
@@ -99,6 +112,7 @@ exports.createAgent = async (req, res) => {
     }
   });
 };
+
 // Get all agents
 exports.getAgents = async (req, res) => {
   try {
