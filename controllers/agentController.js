@@ -40,13 +40,9 @@ exports.createAgent = async (req, res) => {
   const form = new formidable.IncomingForm();
   form.keepExtensions = true;
   form.uploadDir = "/tmp"; // Use Vercel's writable directory
-  form.maxFileSize = 50 * 1024 * 1024; // Set max file size to 50 MB
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      if (err.message.includes("maxFileSize")) {
-        return res.status(413).json({ message: "File size exceeds the 50 MB limit" });
-      }
       console.error("Error parsing form:", err.message);
       return res.status(400).json({ message: "Error parsing form", error: err.message });
     }
