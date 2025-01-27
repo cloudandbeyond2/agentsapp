@@ -105,4 +105,36 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
- 
+
+ // Login User
+exports.loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
+    const collection = await openCollection('add_users');
+
+    const user = await collection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.password !== password) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    res.status(200).json({
+      message: 'Login successful',
+      userId: user.userId,
+      role: user.role,
+      username: user.username
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Internal Server Error', error });
+  }
+};
