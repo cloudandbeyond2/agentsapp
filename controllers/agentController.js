@@ -5,15 +5,15 @@ const Agent = require('../models/Agent');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 
-// Fetching configurations from environment variables
-const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
+// SAS Token and Blob Endpoint (from your provided connection string and token)
+const AZURE_BLOB_ENDPOINT = process.env.AZURE_BLOB_ENDPOINT || "https://21l01l2025.blob.core.windows.net";
+const AZURE_SAS_TOKEN = process.env.AZURE_SAS_TOKEN || "sv=2022-11-02&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-03-27T13:04:08Z&st=2025-01-27T05:04:08Z&spr=https,http&sig=tI1rxd6ULIw12AXwd4kwwSeprceMtIHxCiegyTS3GzQ%3D";
 const CONTAINER_NAME = process.env.AZURE_CONTAINER_NAME || "agentfiles"; // Default container name
-
 
 // Utility function to upload file to Azure Blob Storage
 const uploadToAzure = async (filePath, fileType, blobName) => {
   try {
-    const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
+    const blobServiceClient = new BlobServiceClient(`${AZURE_BLOB_ENDPOINT}?${AZURE_SAS_TOKEN}`);
     const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
 
     // Ensure the container exists
