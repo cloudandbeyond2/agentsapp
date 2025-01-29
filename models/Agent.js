@@ -16,6 +16,7 @@ const agentSchema = new mongoose.Schema({
     wardNumber: String,
     constituency: String,
     city: String,
+    district: String,
     state: String,
     postCode: String,
     country: String,
