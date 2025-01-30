@@ -4,6 +4,7 @@ const {
   getAgents,
   getAgentById,
   updateAgent,
+  updateAgentById,
   deleteAgent,
 } = require('../controllers/agentController');
 
