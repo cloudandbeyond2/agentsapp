@@ -12,7 +12,8 @@ const router = express.Router();
 router.post('/create', createAgent);
 router.get('/', getAgents);
 router.get('/:id', getAgentById);
-router.put('/:id', updateAgent);
+// router.put('/:id', updateAgent);
+router.put('/:id', updateAgentById);
 router.delete('/:id', deleteAgent);
 
 module.exports = router;

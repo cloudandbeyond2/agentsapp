@@ -4,7 +4,8 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 const Agent = require('../models/Agent');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
-
+const { openCollection, closeConnection } = require("../config/db");
+const { ObjectId } = require('mongodb');
 // SAS Token and Blob Endpoint (from your provided connection string and token)
 const AZURE_BLOB_ENDPOINT = process.env.AZURE_BLOB_ENDPOINT || "https://21l01l2025.blob.core.windows.net";
 const AZURE_SAS_TOKEN = process.env.AZURE_SAS_TOKEN || "sv=2022-11-02&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2025-03-27T13:04:08Z&st=2025-01-27T05:04:08Z&spr=https,http&sig=tI1rxd6ULIw12AXwd4kwwSeprceMtIHxCiegyTS3GzQ%3D";
@@ -193,6 +194,29 @@ exports.updateAgent = async (req, res) => {
       res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
   });
+};
+
+exports.updateAgentById = async (req, res) => {
+  const { id } = req.params; // Use userId passed in the request params
+  const updatedData = req.body;
+  console.log(id,updatedData,"123")
+
+  try {
+    const collection = await openCollection('agents');
+    const result = await collection.updateOne(
+      { _id: new ObjectId(id) }, // Match based on userId
+      { $set: updatedData }
+    );
+
+    if (result.matchedCount > 0) {
+      res.status(200).json({ message: 'Agent updated successfully' });
+    } else {
+      res.status(404).json({ message: 'Agent not found' });
+    }
+  } catch (error) {
+    console.error('Error updating Agent:', error);
+    res.status(500).json({ message: 'Internal Server Error', error });
+  }
 };
 
 // Delete an agent
